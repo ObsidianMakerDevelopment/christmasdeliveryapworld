@@ -1,0 +1,656 @@
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Game 1</title>
+</head>
+
+<head>
+    <style>
+        html,
+        body {
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="gameCanvas" width="320" height="240"
+        style="    width: 100%;    height: 100vh;image-rendering: pixelated;"></canvas>
+    <script src="https://unpkg.com/matter-js@0.20.0/build/matter.js"></script>
+    <script>
+        /**
+ * @typedef {"A"|"B"|"X"|"Y"|"Select"|"Start"|"D-Pad Up"|"D-Pad Left"|"D-Pad Right"|"D-Pad Bottom"|"LT"|"RT"|"RB"|"LB"|"VJU"|"VJD"|"VJL"|"VJR"|"Click"} Buttons
+ */
+        class UserInput {
+            constructor() {
+
+                this.mainController = 0;
+                /**
+                 * @type {{[v:Buttons]:number}}
+                 */
+                this.mapping = {
+                    "A": [[0, 1], [4, "KeyN"]],
+                    "B": [[0, 0], [4, "KeyM"]],
+                    "X": [[0, 3], [4, "KeyJ"]],
+                    "Y": [[0, 2], [4, "KeyK"]],
+                    "Select": [[0, 8], [4, "KeyZ"]],
+                    "Start": [[0, 9], [4, "KeyX"]],
+                    "D-Pad Up": [[0, 12], [4, "Digit5"]],
+                    "D-Pad Left": [[0, 14], [4, "KeyE"]],
+                    "D-Pad Right": [[0, 15], [4, "KeyT"]],
+                    "D-Pad Bottom": [[0, 13], [4, "KeyR"]],
+                    "LT": [[0, 6]],
+                    "RT": [[0, 7]],
+                    "LB": [[0, 4], [4, "Digit1"]],
+                    "RB": [[0, 5], [4, "Digit0"]],
+                    "VJR": [[4, "KeyD"]],
+                    "VJL": [[4, "KeyA"]],
+                    "VJU": [[4, "KeyW"]],
+                    "VJD": [[4, "KeyS"]],
+                }
+                this.gamepads = [
+                    new GP(), new GP(), new GP(), new GP(), new GP()
+                ]
+
+                this.prevState = this.getAll()
+                this.events = {}
+                // WSConnect("/inputs", (data) => {
+                //     data = JSON.parse(data);
+                //     if (data.event == "keydown") {
+                //         this.key(data.key, 1.0)
+                //     }
+                //     else if (data.event == "keyup") {
+                //         this.key(data.key, 0.0)
+                //     }
+                //     else if (data.event == "preclick") {
+                //         this.trigger("PreClick", data)
+                //     }
+                //     else if (data.event == "click") {
+                //         this.trigger("Click", data)
+                //     }
+                //     else if (data.event == "move") {
+                //         this.trigger("Move", data)
+                //     }
+                // })
+            }
+            update() {
+                for (const gamepad of navigator.getGamepads()) {
+                    if (!gamepad) continue;
+
+
+                    for (const [i, button] of gamepad.buttons.entries()) {
+                        this.gamepads[gamepad.index].buttons[i] = button.value;
+                    }
+
+                    for (let i = 0; i < gamepad.axes.length; i += 2) {
+                        this.gamepads[gamepad.index].joystick[parseInt(i / 2)].x = gamepad.axes[i]
+                        this.gamepads[gamepad.index].joystick[parseInt(i / 2)].y = -gamepad.axes[i + 1]
+                    }
+                }
+
+                let nw = this.getAll();
+                let triggered = false;
+                for (let key of Object.keys(nw).filter(key => {
+                    return nw[key] != this.prevState[key]
+                })) {
+                    triggered = true;
+                    console.log("trigger", key, nw[key])
+                    this.trigger(key, nw[key]);
+                }
+                if (triggered)
+                    this.trigger("state");
+
+                this.prevState = nw;
+            }
+            setup() {
+                window.addEventListener("gamepadconnected", (e) => {
+                    console.log(
+                        "Gamepad connected at index %d: %s. %d buttons, %d axes.",
+                        e.gamepad.index,
+                        e.gamepad.id,
+                        e.gamepad.buttons.length,
+                        e.gamepad.axes.length,
+                    );
+                    this.gamepads[e.gamepad.index] = new GP2(e.gamepad);
+                });
+                window.addEventListener("gamepaddisconnected", (e) => {
+                    console.log(
+                        "Gamepad disconnected from index %d: %s",
+                        e.gamepad.index,
+                        e.gamepad.id,
+                    );
+                });
+
+                // scene.registerBeforeRender(() => {
+
+                //     for (let gamepad of this.gamepadManager.gamepads) {
+                //         if (!gamepad) continue;
+                //         if (gamepad.isConnected)
+                //             gamepad.update();
+                //         let browserGamePad = gamepad.browserGamepad;
+                //         if (!this.gamepads[gamepad.index])
+                //             this.gamepads[gamepad.index] = new GP()
+                //         for (let i = 0; i < browserGamePad.buttons.length; i++) {
+                //             if (this.gamepads[gamepad.index].buttons[i] && this.gamepads[gamepad.index].buttons[i] != browserGamePad.buttons[i].value)
+                //                 this.trigger_raw(gamepad.index, i, browserGamePad.buttons[i].value)
+                //             this.gamepads[gamepad.index].buttons[i] = browserGamePad.buttons[i].value;
+                //         }
+
+                //         this.gamepads[gamepad.index].joystick[0] = gamepad.leftStick
+                //         this.gamepads[gamepad.index].joystick[1] = gamepad.rightStick
+                //     }
+
+                //     let nw = this.getAll();
+                //     let triggered = false;
+                //     for (let key of Object.keys(nw).filter(key => {
+                //         return nw[key] != this.prevState[key]
+                //     })) {
+                //         triggered = true;
+                //         this.trigger(key, nw[key]);
+                //     }
+                //     if (triggered)
+                //         this.trigger("state");
+
+                //     this.prevState = nw;
+                // })
+                this.gamepads[4].buttons = {};
+                window.addEventListener("keydown", e => {
+                    this.key(e.code, 1.0);
+                });
+                window.addEventListener("keyup", e => {
+                    this.key(e.code, 0.0);
+                });
+
+            }
+            key(key, value) {
+                this.gamepads[4].buttons[key] = value
+                this.trigger_raw(4, key, value)
+            }
+            /**
+             * 
+             * @param {Buttons} key 
+             */
+            get(key) {
+                //if (!this.gamepads[this.mainController]) return 0;
+                //return this.gamepads[this.mainController].buttons[this.mapping[key]] || 0;
+
+                let val = 0;
+                for (let mapping of this.mapping[key]) {
+                    let [gid, bid] = mapping;
+                    let btnVal = this.gamepads[gid].buttons[bid] || 0;
+                    if (btnVal > val)
+                        val = btnVal;
+                }
+                return val;
+            }
+            /**
+             * 
+             * @returns {{[btn:Buttons]:number,Stick:{x:number, y:number}}}
+             */
+            getAll() {
+                let ret = {};
+                ret["A"] = 0; ret["B"] = 0; ret["X"] = 0; ret["Y"] = 0; ret["Select"] = 0; ret["Start"] = 0; ret["D-Pad Up"] = 0; ret["D-Pad Left"] = 0; ret["D-Pad Right"] = 0; ret["D-Pad Bottom"] = 0; ret["LT"] = 0; ret["RT"] = 0; ret["RB"] = 0; ret["LB"] = 0; ret["VJU"] = 0; ret["VJD"] = 0; ret["VJL"] = 0; ret["VJR"] = 0; ret["Click"] = 0;
+                for (let key in this.mapping) {
+                    ret[key] = this.get(key);
+                }
+                //ret["Stick"] = this.getStick();
+                return ret;
+            }
+            getStick() {
+                //Find the joystick with the furthest from 0
+                let all_JS = this.gamepads.map(x => x.joystick).flat(1).map(j => { return { x: j.x, y: -j.y } });
+                all_JS.push({ x: this.get("VJR") - this.get("VJL"), y: this.get("VJU") - this.get("VJD") })
+                let joystick = all_JS[0];
+                window.all_JS = all_JS;
+                let joystick_d = 0;
+                for (let joy of all_JS) {
+                    let d = joy.x * joy.x + joy.y * joy.y
+                    if (d > joystick_d) {
+                        joystick = joy;
+                        joystick_d = d;
+                    }
+                }
+                return { x: joystick.x, y: joystick.y }
+            }
+            map(key, controller, button) {
+                this.mapping[key].push([controller, button])
+                this.saveMapping();
+            }
+            clearmap(key) {
+                this.mapping[key] = []
+                this.saveMapping();
+            }
+            /**
+             * 
+             * @param {Buttons} event 
+             * @param {(state:number)=>void} fn 
+             */
+            addEventListener(event, fn) {
+                this.events[event] = this.events[event] || []
+                /**
+                 * @type {((state:number)=>void)[]}
+                 */
+                let eventArray = this.events[event]
+                eventArray.push(fn);
+            }
+            removeEventListener(event, fn) {
+                this.events[event] = this.events[event] || []
+                let eventArray = this.events[event]
+                let idx = eventArray.indexOf(fn);
+                if (idx >= -1)
+                    eventArray.splice(idx, 1)
+            }
+            removeEventListenerAll(fn) {
+                for (let key in this.events) {
+                    this.removeEventListener(key, fn)
+                }
+            }
+            trigger_raw(controller, button, value) {
+                this.trigger("raw", { controller, button, value })
+            }
+            trigger(event, value) {
+                this.events[event] = this.events[event] || []
+                let eventArray = this.events[event]
+
+                for (let evt of eventArray) {
+                    try {
+                        evt(value)
+                    }
+                    catch (err) {
+                        console.error("Error on event", event, evt, err)
+                    }
+                }
+            }
+
+            /**
+             * @type {UserInput}
+             */
+            static instance;
+            static create() {
+                if (!UserInput.instance)
+                    UserInput.instance = new UserInput();
+                return UserInput.instance;
+            }
+
+        }
+        class GP {
+            constructor() {
+                /**
+                 * @type {number[]}
+                 */
+                this.buttons = []
+
+                this.joystick = []
+            }
+        }
+        class GP2 extends GP {
+            constructor(gamepad) {
+                super()
+                /**
+                 * @type {Gamepad}
+                 */
+                this.gamepad = gamepad;
+
+                for (let i = 0; i < gamepad.buttons.length; i++) {
+                    this.buttons.push(0)
+                }
+                for (let i = 0; i < gamepad.axes.length; i += 2) {
+                    this.joystick.push({ x: 0, y: 0 })
+                }
+            }
+        }
+        window.UserInput = UserInput;
+
+        UserInput.create().setup()
+
+        function rf() {
+            requestAnimationFrame(rf)
+            let ui = UserInput.create();
+            ui.update()
+        }
+        requestAnimationFrame(rf)
+    </script>
+    <script type="module">
+        import * as AP from "https://unpkg.com/archipelago.js@2.0.4/dist/archipelago.min.js";
+
+        const client = new AP.Client();
+
+
+        let url = window.prompt("Enter AP server", "archipelago.gg:38281");
+        let username = window.prompt("Enter username", "Player1");
+        let password = window.prompt("Enter password or leave empty", "");
+
+        try {
+            let logData = await client.login(url, username, "ChristmasDelivery", { password, version: { major: 0, minor: 5, build: 1 }, items: AP.itemsHandlingFlags.all })
+            client.items.on("itemsReceived", (items) => {
+                for (let item of items) {
+                    //item.id
+                }
+            })
+            client.room.on("locationsChecked", (locations) => {
+                if (client.room.checkedLocations.length == client.room.allLocations.length)
+                    client.goal()
+            })
+            if (client.room.checkedLocations.length == client.room.allLocations.length)
+                client.goal()
+        }
+        catch { }
+
+        let colorOffset = 1000;
+        let colors = ["aqua", "beige", "brown", "blue", "chartreuse", "coral", "crimson", "darkcyan", "darkorange", "orange", "deepskyblue", "fuchsia", "green"]
+
+        let mp = 100
+        let angle = 0
+        function obtainedColors() {
+            try {
+                return client.items.received.map(x => colors[x.id - colorOffset]);
+            }
+            catch {
+                return []
+            }
+        }
+        var Engine = Matter.Engine,
+            Render = Matter.Render,
+            Runner = Matter.Runner,
+            Bodies = Matter.Bodies,
+            Composite = Matter.Composite;
+
+        var particles = [];
+        for (var i = 0; i < mp; i++) {
+            particles.push({
+                x: Math.random() * 320, //x-coordinate
+                y: Math.random() * 240, //y-coordinate
+                r: Math.random() * 2 + 1, //radius
+                d: Math.random() * mp //density
+            });
+        }
+        // create an engine
+        var engine = Engine.create();
+        let sleigh = null;
+        let scale = 0.5
+        let release = 0
+        let selectedColor = 0
+        function reset() {
+            let body = Composite.allBodies(engine.world)
+            for (let i = 0; i < body.length; i += 1) {
+                Matter.World.remove(engine.world, body[i]);
+            }
+
+            release = 0;
+            // create two boxes and a ground
+            var ground = Bodies.rectangle(160, 240, 32000, 10, { isStatic: true, render: { fillStyle: "white", strokeStyle: "white" } });
+
+            var boxA = Bodies.rectangle(160, 0, 20, 20);
+            var boxB = Bodies.rectangle(165, -30, 20, 20);
+
+            sleigh = getSleigh(160, 120);
+            // add all of the bodies to the world
+
+            Composite.add(engine.world, [ground, boxA, boxB, sleigh]);
+
+            function getSleigh(x, y) {
+                let parts = []
+
+                parts.push(Bodies.rectangle(x, y, 60 * scale, 5 * scale, { render: { fillStyle: "#777" } }));
+                parts.push(Bodies.rectangle(x - 30 * scale, y - 3.5 * scale, 10 * scale, 5 * scale, { angle: 1, render: { fillStyle: "#777" } }));
+                parts.push(Bodies.rectangle(x, y - 20 * scale, 60 * scale, 5 * scale, { render: { fillStyle: "#777" } }));
+
+                parts.push(Bodies.rectangle(x - 15 * scale, y - 10 * scale, 5 * scale, 20 * scale, { render: { fillStyle: "#777" } }));
+                parts.push(Bodies.rectangle(x + 15 * scale, y - 10 * scale, 5 * scale, 20 * scale, { render: { fillStyle: "#777" } }));
+                parts.push(Bodies.circle(x + 5 * scale, y - 30 * scale, 15 * scale, { render: { fillStyle: "red" } }));
+                parts.push(Bodies.circle(x + 20 * scale, y - 30 * scale, 15 * scale, { render: { fillStyle: "brown" } }));
+                parts.push(Bodies.circle(x + 5 * scale, y - 45 * scale, 10 * scale, { render: { fillStyle: "salmon" } }));
+                parts.push(Bodies.rectangle(x + 10 * scale, y - 50 * scale, 15 * scale, 5 * scale, { angle: 1, render: { fillStyle: "white" } }));
+                parts.push(Bodies.rectangle(x + 15 * scale, y - 55 * scale, 10 * scale, 10 * scale, { angle: 1, render: { fillStyle: "red" } }));
+
+                for (let part of parts) {
+                    part.render.strokeStyle = "transparent"
+                }
+                return Matter.Body.create({
+                    parts, frictionAir: 0.9,
+                    density: 0.01,
+                    friction: 1, inertia: "Infinity",
+                    collisionFilter: { group: -2 }
+                });
+            }
+            function house(color, x) {
+                let mainBuild = Bodies.rectangle(x, 230, 30, 20, { render: { fillStyle: color }, isStatic: true })
+                let roof = Bodies.rectangle(x, 220, 20, 20, { angle: 45 * (Math.PI / 180), render: { fillStyle: color }, isStatic: true })
+                let chimney = Bodies.rectangle(x + 15, 230, 5, 50, { render: { fillStyle: color }, isStatic: true, isSensor: true })
+
+                let house = Matter.Body.create({
+                    parts: [roof, mainBuild], isStatic: true
+                });
+
+                Matter.World.add(engine.world, house)
+                Matter.World.add(engine.world, chimney)
+
+                return [house, chimney]
+            }
+            for (let i = 0; i < colors.length; i++) {
+                house(colors[i], -500 * i - 100)
+            }
+        }
+        reset()
+        // create runner
+        var runner = Runner.create();
+        runner.isFixed = false;
+
+        // run the engine
+        Runner.run(runner, engine);
+
+        Matter.Events.on(engine, 'collisionStart', function (event) {
+            var pairs = event.pairs;
+
+            for (var i = 0, j = pairs.length; i != j; ++i) {
+                var pair = pairs[i];
+
+                let isGiftCollision = pair.bodyA.death || pair.bodyB.death;
+                let isSensorCollision = pair.bodyA.isSensor || pair.bodyB.isSensor;
+
+                if (isGiftCollision && isSensorCollision) {
+                    let sensor = pair.bodyA.isSensor ? pair.bodyA : pair.bodyB
+                    let gift = pair.bodyA.death ? pair.bodyA : pair.bodyB
+
+                    if (sensor.render.fillStyle == gift.color) {
+                        console.log("Trigger AP check ", pair.bodyA, pair.bodyB)
+
+                        try {
+                            client.check(colors.indexOf(gift.color) + colorOffset);
+                            if (client.room.checkedLocations.length == client.room.allLocations.length)
+                                client.goal()
+                        }
+                        catch {
+
+                        }
+                        Matter.World.remove(engine.world, gift);
+                    }
+                }
+
+                // if (pair.bodyA === collider) {
+                //     pair.bodyB.render.strokeStyle = colorA;
+                // } else if (pair.bodyB === collider) {
+                //     pair.bodyA.render.strokeStyle = colorA;
+                // }
+            }
+        });
+
+
+        function cycle(dt) {
+            /**
+             * @type {HTMLCanvasElement}
+             **/
+            let canvas = document.querySelector("canvas#gameCanvas")
+            let ctx = canvas.getContext("2d");
+
+            ctx.clearRect(0, 0, 320, 240);
+            ctx.fillStyle = "black"
+            ctx.fillRect(0, 0, 320, 240)
+
+            ctx.save()
+            ctx.translate(-sleigh.position.x + 160, 0);
+
+            function drawBody() {
+                //draw body
+                ctx.beginPath();
+                let body = Composite.allBodies(engine.world)
+                for (let i = 0; i < body.length; i += 1) {
+                    function pBody(bd) {
+                        if (bd.render) {
+                            ctx.lineWidth = bd.render.lineWidth || 0;
+                            ctx.fillStyle = bd.render.fillStyle || '#777';
+                            ctx.strokeStyle = bd.render.strokeStyle || 'transparent';
+                        }
+                        else {
+                            ctx.lineWidth = 0;
+                            ctx.fillStyle = '#777';
+                            ctx.strokeStyle = 'transparent';
+                        }
+
+                        if (bd.parts && bd.parts.length > 1) {
+                            for (var i = 1; i < bd.parts.length; i++)
+                                pBody(bd.parts[i])
+                        }
+                        else {
+                            if (bd.render) {
+                                ctx.lineWidth = bd.render.lineWidth || 0;
+                                ctx.fillStyle = bd.render.fillStyle || '#777';
+                                ctx.strokeStyle = bd.render.strokeStyle || 'transparent';
+                            }
+
+                            let vertices = bd.vertices;
+                            ctx.beginPath()
+                            ctx.moveTo(vertices[0].x, vertices[0].y);
+                            for (let j = 1; j < vertices.length; j += 1) {
+                                ctx.lineTo(vertices[j].x, vertices[j].y);
+                            }
+                            ctx.lineTo(vertices[0].x, vertices[0].y);
+
+                            ctx.fill();
+                            ctx.stroke();
+
+                            if (bd.death && bd.death < dt) {
+                                Matter.World.remove(engine.world, bd);
+                            }
+                        }
+                    }
+                    pBody(body[i])
+                }
+
+            }
+
+
+            drawBody()
+
+            function drawReindeers() {
+                for (var i = 0; i < 2; i++) {
+                    ctx.fillStyle = "#3c280d"
+                    ctx.fillRect(sleigh.position.x - 50 - i * 25, sleigh.position.y, 17, 10)
+                    ctx.fillRect(sleigh.position.x - 55 - i * 25, sleigh.position.y - 5, 8, 8)
+                    ctx.fillRect(sleigh.position.x - 50 - i * 25, sleigh.position.y + 5, 2, 10)
+                    ctx.fillRect(sleigh.position.x - 36 - i * 25, sleigh.position.y + 5, 2, 10)
+
+
+                    ctx.fillRect(sleigh.position.x - 51 - i * 25, sleigh.position.y - 10, 1, 6)
+                    ctx.fillRect(sleigh.position.x - 51 - i * 25, sleigh.position.y - 10, 6, 1)
+
+                    ctx.fillStyle = "crimson"
+                    ctx.fillRect(sleigh.position.x - 57 - i * 25, sleigh.position.y - 2, 3, 3)
+
+                }
+                ctx.fillStyle = obtainedColors()[selectedColor % obtainedColors().length] || "transparent"
+                ctx.fillRect(sleigh.position.x - 75, sleigh.position.y + 5, 75, 1)
+
+            }
+            drawReindeers()
+
+
+            ctx.restore()
+            sleigh.force.y = 0.01 * scale * UserInput.create().getStick().y;
+            sleigh.force.x = Math.min(0.005 * scale * UserInput.create().getStick().x, 0.2);
+            if (dt > release && UserInput.create().get("Start") > 0.5) {
+                release = dt + 333;
+                reset()
+            }
+            if (dt > release && UserInput.create().get("B") > 0.5) {
+                release = dt + 333;
+                selectedColor += 1
+            }
+            if (dt > release && UserInput.create().get("A") > 0.5) {
+                //Add a falling gift
+                let gift = Matter.Bodies.rectangle(sleigh.position.x - 40 * scale, sleigh.position.y + 6 * scale, 10, 10, { render: { fillStyle: "white" } })//,{collisionFilter: {            group: -2 }})
+                gift.death = dt + 5000
+                gift.color = obtainedColors()[selectedColor % obtainedColors().length] || "transparent"
+                if (gift.color != "transparent") {
+                    gift.render.fillStyle = gift.color
+                    Matter.Body.setVelocity(gift, {
+                        x: sleigh.velocity.x * 1.2,
+                        y: sleigh.velocity.y
+                    });
+                    Matter.World.add(engine.world, gift);
+                    release = dt + 333;
+                }
+            }
+
+            if (sleigh.velocity.x > -0.1) {
+                Matter.Body.setVelocity(sleigh, {
+                    x: -0.1,
+                    y: sleigh.velocity.y
+                });
+            }
+            if (sleigh.position.x < -16000) {
+                Matter.Body.setPosition(sleigh, {
+                    x: sleigh.position.x + 32000,
+                    y: sleigh.position.y
+                })
+            }
+
+            ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+            ctx.beginPath();
+            for (var i = 0; i < mp; i++) {
+                var p = particles[i];
+                ctx.moveTo(p.x, p.y);
+                ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2, true);
+            }
+            ctx.fill();
+
+            angle += 0.001;
+            for (var i = 0; i < mp; i++) {
+                var p = particles[i];
+                //Updating X and Y coordinates
+                //We will add 1 to the cos function to prevent negative values which will lead flakes to move upwards
+                //Every particle has its own density which can be used to make the downward movement different for each flake
+                //Lets make it more random by adding in the radius
+                p.y += (Math.cos(angle + p.d) + 1 + p.r / 2) * 0.5;
+                p.x += Math.sin(angle);
+
+                //Sending flakes back from the top when it exits
+                //Lets make it a bit more organic and let flakes enter from the left and right also.
+                if (p.x > 320 + 5 || p.x < -5 || p.y > 240) {
+                    if (i % 3 > 0) //66.67% of the flakes
+                    {
+                        particles[i] = { x: Math.random() * 320, y: -10, r: p.r, d: p.d };
+                    }
+                    else {
+                        //If the flake is exitting from the right
+                        if (Math.sin(angle) > 0) {
+                            //Enter from the left
+                            particles[i] = { x: -5, y: Math.random() * 240, r: p.r, d: p.d };
+                        }
+                        else {
+                            //Enter from the right
+                            particles[i] = { x: 320 + 5, y: Math.random() * 240, r: p.r, d: p.d };
+                        }
+                    }
+                }
+            }
+
+            requestAnimationFrame(cycle)
+        }
+        requestAnimationFrame(cycle)
+    </script>
+</body>
+
+</html>
