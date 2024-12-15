@@ -335,7 +335,8 @@
             })
             if (client.room.checkedLocations.length == client.room.allLocations.length)
                 client.goal()
-            
+            c
+
             client.socket.on("disconnected", () => {
                 client.login(url, username, "ChristmasDelivery", { password, version: { major: 0, minor: 5, build: 1 }, items: AP.itemsHandlingFlags.all }).catch(console.error)
             })
@@ -344,6 +345,21 @@
 
         let colorOffset = 1000;
         let colors = ["aqua", "beige", "brown", "blue", "chartreuse", "coral", "crimson", "darkcyan", "darkorange", "orange", "deepskyblue", "fuchsia", "green"]
+        try {
+            window.hints = await client.scout(colors.map((v, i) => i + colorOffset), 0)
+        }
+        catch {
+            window.hints = []
+        }
+        function completed() {
+            try {
+                return client.room.checkedLocations.map(x => colors[x - colorOffset]);
+            }
+            catch {
+                return []
+            }
+        }
+        window.completed = completed;
 
         let mp = 100
         let angle = 0
@@ -427,7 +443,8 @@
                 let house = Matter.Body.create({
                     parts: [roof, mainBuild], isStatic: true
                 });
-
+                mainBuild.house = color;
+                roof.roof = color;
                 Matter.World.add(engine.world, house)
                 Matter.World.add(engine.world, chimney)
 
@@ -480,7 +497,28 @@
                 // }
             }
         });
+        function randomInt(max) {
+            return Math.floor(Math.random() * max);
+        }
+        const maxStarRadius = 1.5;
 
+        function createStars(width, height, spacing) {
+            const stars = [];
+
+            for (let x = 0; x < width; x += spacing) {
+                for (let y = 0; y < height; y += spacing) {
+                    const star = {
+                        x: x + randomInt(spacing),
+                        y: y + randomInt(spacing),
+                        r: Math.random() * maxStarRadius,
+                    };
+                    stars.push(star);
+                }
+            }
+            return stars;
+        }
+
+        const stars = createStars(320, 240, 30);
 
         function cycle(dt) {
             /**
@@ -489,12 +527,58 @@
             let canvas = document.querySelector("canvas#gameCanvas")
             let ctx = canvas.getContext("2d");
 
+
             ctx.clearRect(0, 0, 320, 240);
-            ctx.fillStyle = "black"
+            ctx.fillStyle = "#1d2951"
             ctx.fillRect(0, 0, 320, 240)
 
+            ctx.fillStyle = "white"
+            ctx.font = "12px Arial"
+            let sc = obtainedColors()[selectedColor % obtainedColors().length] || "transparent"
+            if (sc != "transparent") {
+                let hint = "";
+                let hint_Obj = window.hints.find(x => x.locationId == colors.indexOf(sc) + colorOffset);
+                if (hint_Obj) {
+                    hint = ": " + hint_Obj.name + " for " + hint_Obj.receiver.name
+                }
+
+                ctx.fillText(sc + " " + hint, 0, 12);
+            }
+
+            stars.forEach(function (star) {
+                const x = (star.x - sleigh.position.x*0.1)%320;
+                const y = star.y;
+                const r = 1;
+                ctx.beginPath();
+                ctx.fillStyle = "#f0e68c";
+                ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            function drawBackground() {
+                function drawTree(x, h, color) {
+                    ctx.fillStyle = color
+                    ctx.beginPath()
+                    ctx.moveTo(x - h * 0.2, 235);
+                    ctx.lineTo(x + h * 0.2, 235);
+                    ctx.lineTo(x, 235 - h)
+                    ctx.closePath()
+                    ctx.fill()
+                }
+
+                for (let i = -20 - (sleigh.position.x * 0.95 % 20); i < 340; i += 10) {
+                    drawTree(i, 45, "#014421")
+                }
+                for (let i = -20 - (sleigh.position.x * 0.99 % 20); i < 340; i += 10) {
+                    drawTree(i, 45, "#013220")
+                }
+                for (let i = -20 - (sleigh.position.x % 20); i < 340; i += 10) {
+                    drawTree(i, 25, "darkgreen")
+                }
+            }
+            drawBackground();
             ctx.save()
-            ctx.translate(-sleigh.position.x + 160, 0);
+            ctx.translate(-sleigh.position.x + 250, 0);
 
             function drawBody() {
                 //draw body
@@ -522,7 +606,12 @@
                                 ctx.lineWidth = bd.render.lineWidth || 0;
                                 ctx.fillStyle = bd.render.fillStyle || '#777';
                                 ctx.strokeStyle = bd.render.strokeStyle || 'transparent';
+
+                                if (bd.roof && completed().includes(bd.roof)) {
+                                    ctx.fillStyle = "white"
+                                }
                             }
+
 
                             let vertices = bd.vertices;
                             ctx.beginPath()
@@ -534,6 +623,12 @@
 
                             ctx.fill();
                             ctx.stroke();
+
+                            if (bd.house) {
+                                ctx.font = "6pt arial"
+                                ctx.fillStyle = "black"
+                                ctx.fillText(bd.house, bd.position.x - 15, bd.position.y)
+                            }
 
                             if (bd.death && bd.death < dt) {
                                 Matter.World.remove(engine.world, bd);
@@ -604,9 +699,15 @@
                     y: sleigh.velocity.y
                 });
             }
-            if (sleigh.position.x < -16000) {
+            if (sleigh.position.x < -6250) {
                 Matter.Body.setPosition(sleigh, {
-                    x: sleigh.position.x + 32000,
+                    x: 320,
+                    y: sleigh.position.y
+                })
+            }
+            if (sleigh.position.x > 320) {
+                Matter.Body.setPosition(sleigh, {
+                    x: -6250,
                     y: sleigh.position.y
                 })
             }
