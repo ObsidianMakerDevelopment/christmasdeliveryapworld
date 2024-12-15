@@ -2,7 +2,7 @@
 
 1. Click Code
 2. Clock Download ZIP
-3. Rename the downloaded zip to christmasdelivery.apworld (Yes change .zip to .apworld)
+3. Rename the downloaded zip to .apworld (Yes change .zip to .apworld) On windows make sure you are showing file extentions.
 
 Install as usual
 
