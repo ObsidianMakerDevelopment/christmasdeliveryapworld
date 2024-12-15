@@ -546,7 +546,7 @@
             }
 
             stars.forEach(function (star) {
-                const x = (star.x - sleigh.position.x*0.1)%320;
+                const x = (star.x - sleigh.position.x * 0.1) % 320;
                 const y = star.y;
                 const r = 1;
                 ctx.beginPath();
@@ -632,6 +632,25 @@
 
                             if (bd.death && bd.death < dt) {
                                 Matter.World.remove(engine.world, bd);
+                            }
+                            else if(bd.death) {
+                                ctx.beginPath()
+                                ctx.moveTo((vertices[0].x+vertices[1].x)/2,(vertices[0].y+vertices[1].y)/2);
+                                ctx.lineTo((vertices[2].x+vertices[3].x)/2,(vertices[2].y+vertices[3].y)/2);
+                                ctx.strokeStyle = "white";
+                                ctx.stroke();
+
+                                ctx.beginPath()
+                                ctx.moveTo((vertices[1].x+vertices[2].x)/2,(vertices[1].y+vertices[2].y)/2);
+                                ctx.lineTo((vertices[3].x+vertices[0].x)/2,(vertices[3].y+vertices[0].y)/2);
+                                ctx.strokeStyle = "white";
+                                ctx.stroke();
+
+                                ctx.beginPath()
+                                ctx.fillStyle = "white"
+                                ctx.arc((vertices[0].x+vertices[1].x)/2,(vertices[0].y+vertices[1].y)/2, 2, 0, Math.PI*2);
+                                ctx.fill()
+
                             }
                         }
                     }
