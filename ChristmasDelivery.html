@@ -16,6 +16,7 @@
 </head>
 
 <body>
+    <script src="http://unpkg.com/tone"></script>
     <canvas id="gameCanvas" width="320" height="240"
         style="    width: 100%;    height: 100vh;image-rendering: pixelated;"></canvas>
     <script src="https://unpkg.com/matter-js@0.20.0/build/matter.js"></script>
@@ -315,8 +316,9 @@
     <script type="module">
         import * as AP from "https://unpkg.com/archipelago.js@2.0.4/dist/archipelago.min.js";
 
+        const synth = new Tone.Synth().toDestination();
+        window.synth = synth;
         const client = new AP.Client();
-
 
         let url = window.prompt("Enter AP server", "archipelago.gg:38281");
         let username = window.prompt("Enter username", "Player1");
@@ -327,6 +329,7 @@
             client.items.on("itemsReceived", (items) => {
                 for (let item of items) {
                     //item.id
+                    synth.triggerAttackRelease("C4", "8n");
                 }
             })
             client.room.on("locationsChecked", (locations) => {
@@ -476,7 +479,9 @@
 
                     if (sensor.render.fillStyle == gift.color) {
                         console.log("Trigger AP check ", pair.bodyA, pair.bodyB)
-
+                        const now = Tone.now();
+                        synth.triggerAttackRelease("C4", "8n", now);
+                        synth.triggerAttackRelease("E4", "8n", now + 0.2);
                         try {
                             client.check(colors.indexOf(gift.color) + colorOffset);
                             if (client.room.checkedLocations.length == client.room.allLocations.length)
