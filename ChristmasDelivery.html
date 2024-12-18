@@ -319,38 +319,59 @@
         const synth = new Tone.Synth().toDestination();
         window.synth = synth;
         const client = new AP.Client();
+        window.client= client;
 
-        let url = window.prompt("Enter AP server", "archipelago.gg:38281");
-        let username = window.prompt("Enter username", "Player1");
-        let password = window.prompt("Enter password or leave empty", "");
+        const urlParams = new URLSearchParams(window.location.search);
+
+        let url = urlParams.get("server") || window.prompt("Enter AP server", "archipelago.gg:38281");
+        let username = urlParams.get("username") || window.prompt("Enter username", "Player1");
+        let password = "";
+        if (!urlParams.has("password"))
+            password = window.prompt("Enter password or leave empty", "");
 
         try {
             let logData = await client.login(url, username, "ChristmasDelivery", { password, version: { major: 0, minor: 5, build: 1 }, items: AP.itemsHandlingFlags.all })
             client.items.on("itemsReceived", (items) => {
                 for (let item of items) {
                     //item.id
-                    synth.triggerAttackRelease("C4", "8n");
+                    try {
+                        synth.triggerAttackRelease("C4", "8n");
+                    }
+                    catch { }
                 }
             })
             client.room.on("locationsChecked", (locations) => {
                 if (client.room.checkedLocations.length == client.room.allLocations.length)
-                    client.goal()
+                    try {
+                        client.goal()
+                    }
+                    catch {
+
+                    }
             })
             if (client.room.checkedLocations.length == client.room.allLocations.length)
-                client.goal()
+                try {
+                    client.goal()
+                }
+                catch {
+
+                }
 
             client.socket.on("disconnected", () => {
                 client.login(url, username, "ChristmasDelivery", { password, version: { major: 0, minor: 5, build: 1 }, items: AP.itemsHandlingFlags.all }).catch(console.error)
             })
         }
-        catch { }
+        catch(err) {console.error(error) }
 
         let colorOffset = 1000;
         let colors = ["aqua", "beige", "brown", "blue", "chartreuse", "coral", "crimson", "darkcyan", "darkorange", "orange", "deepskyblue", "fuchsia", "green"]
         try {
+            console.log("Asking for hints");
             window.hints = await client.scout(colors.map((v, i) => i + colorOffset), 0)
+        
         }
-        catch {
+        catch (err){
+            console.error(err);
             window.hints = []
         }
         function completed() {
@@ -367,12 +388,13 @@
         let angle = 0
         function obtainedColors() {
             try {
-                return client.items.received.map(x => colors[x.id - colorOffset]);
+                return [...new Set(client.items.received.map(x => colors[x.id - colorOffset]))];
             }
             catch {
                 return []
             }
         }
+        window.obtainedColors = obtainedColors;
         var Engine = Matter.Engine,
             Render = Matter.Render,
             Runner = Matter.Runner,
@@ -478,11 +500,15 @@
                     let gift = pair.bodyA.death ? pair.bodyA : pair.bodyB
 
                     if (sensor.render.fillStyle == gift.color) {
-                        console.log("Trigger AP check ", pair.bodyA, pair.bodyB)
-                        const now = Tone.now();
-                        synth.triggerAttackRelease("C4", "8n", now);
-                        synth.triggerAttackRelease("E4", "8n", now + 0.2);
                         try {
+                            const now = Tone.now();
+                            synth.triggerAttackRelease("C4", "8n", now);
+                            synth.triggerAttackRelease("E4", "8n", now + 0.2);
+                        }
+                        catch { }
+                        try {
+                            console.log("Trigger AP check ", pair.bodyA, pair.bodyB)
+
                             client.check(colors.indexOf(gift.color) + colorOffset);
                             if (client.room.checkedLocations.length == client.room.allLocations.length)
                                 client.goal()
@@ -545,9 +571,44 @@
                 if (hint_Obj) {
                     hint = ": " + hint_Obj.name + " for " + hint_Obj.receiver.name
                 }
-
-                ctx.fillText(sc + " " + hint, 0, 12);
+                ctx.textAlign = "right"
+                ctx.fillText(sc + " " + hint, 320, 12);
+                ctx.textAlign = "left"
             }
+
+            (function () {
+                ctx.fillStyle = sc || "red";
+                ctx.fillRect(3, 3, 10, 10)
+                ctx.strokeStyle = "white"
+                ctx.strokeRect(3, 3, 10, 10)
+                ctx.beginPath()
+                ctx.moveTo(8, 3)
+                ctx.lineTo(8, 13)
+                ctx.stroke()
+                ctx.beginPath()
+                ctx.moveTo(3, 8)
+                ctx.lineTo(13, 8)
+                ctx.stroke()
+                ctx.beginPath()
+                ctx.fillStyle = "white";
+                ctx.arc(8, 3, 2, 0, Math.PI * 2);
+                ctx.fill()
+
+                ctx.fillStyle = "white"
+                ctx.fillText(obtainedColors().length + "/" + colors.length, 15, 12);
+                let sw = ctx.lineWidth;
+                ctx.lineWidth = 2
+                ctx.strokeStyle = "lime"
+                ctx.beginPath()
+                ctx.moveTo(48, 8)
+                ctx.lineTo(50, 11)
+                ctx.lineTo(53, 4)
+                ctx.stroke()
+                ctx.lineWidth = sw;
+
+                ctx.fillStyle = "white"
+                ctx.fillText(completed().length + "/" + (new Set([...obtainedColors(), ...completed()])).size, 55, 12);
+            })()
 
             stars.forEach(function (star) {
                 const x = (star.x - sleigh.position.x * 0.1) % 320;
@@ -637,22 +698,22 @@
                             if (bd.death && bd.death < dt) {
                                 Matter.World.remove(engine.world, bd);
                             }
-                            else if(bd.death) {
+                            else if (bd.death) {
                                 ctx.beginPath()
-                                ctx.moveTo((vertices[0].x+vertices[1].x)/2,(vertices[0].y+vertices[1].y)/2);
-                                ctx.lineTo((vertices[2].x+vertices[3].x)/2,(vertices[2].y+vertices[3].y)/2);
+                                ctx.moveTo((vertices[0].x + vertices[1].x) / 2, (vertices[0].y + vertices[1].y) / 2);
+                                ctx.lineTo((vertices[2].x + vertices[3].x) / 2, (vertices[2].y + vertices[3].y) / 2);
                                 ctx.strokeStyle = "white";
                                 ctx.stroke();
 
                                 ctx.beginPath()
-                                ctx.moveTo((vertices[1].x+vertices[2].x)/2,(vertices[1].y+vertices[2].y)/2);
-                                ctx.lineTo((vertices[3].x+vertices[0].x)/2,(vertices[3].y+vertices[0].y)/2);
+                                ctx.moveTo((vertices[1].x + vertices[2].x) / 2, (vertices[1].y + vertices[2].y) / 2);
+                                ctx.lineTo((vertices[3].x + vertices[0].x) / 2, (vertices[3].y + vertices[0].y) / 2);
                                 ctx.strokeStyle = "white";
                                 ctx.stroke();
 
                                 ctx.beginPath()
                                 ctx.fillStyle = "white"
-                                ctx.arc((vertices[0].x+vertices[1].x)/2,(vertices[0].y+vertices[1].y)/2, 2, 0, Math.PI*2);
+                                ctx.arc((vertices[0].x + vertices[1].x) / 2, (vertices[0].y + vertices[1].y) / 2, 2, 0, Math.PI * 2);
                                 ctx.fill()
 
                             }
