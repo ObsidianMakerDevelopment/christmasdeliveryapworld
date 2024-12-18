@@ -335,7 +335,6 @@
             })
             if (client.room.checkedLocations.length == client.room.allLocations.length)
                 client.goal()
-            c
 
             client.socket.on("disconnected", () => {
                 client.login(url, username, "ChristmasDelivery", { password, version: { major: 0, minor: 5, build: 1 }, items: AP.itemsHandlingFlags.all }).catch(console.error)
