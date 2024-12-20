@@ -2,7 +2,7 @@
 
 <head>
     <meta charset="utf-8">
-    <title>Game 1</title>
+    <title>Christmas Delivery</title>
 </head>
 
 <head>
@@ -85,7 +85,7 @@
                         this.gamepads[gamepad.index].buttons[i] = button.value;
                     }
 
-                    for (let i = 0; i < gamepad.axes.length; i += 2) {
+                    for (let i = 0; i < 2; i += 2) {
                         this.gamepads[gamepad.index].joystick[parseInt(i / 2)].x = gamepad.axes[i]
                         this.gamepads[gamepad.index].joystick[parseInt(i / 2)].y = -gamepad.axes[i + 1]
                     }
@@ -97,7 +97,6 @@
                     return nw[key] != this.prevState[key]
                 })) {
                     triggered = true;
-                    console.log("trigger", key, nw[key])
                     this.trigger(key, nw[key]);
                 }
                 if (triggered)
@@ -123,39 +122,7 @@
                         e.gamepad.id,
                     );
                 });
-
-                // scene.registerBeforeRender(() => {
-
-                //     for (let gamepad of this.gamepadManager.gamepads) {
-                //         if (!gamepad) continue;
-                //         if (gamepad.isConnected)
-                //             gamepad.update();
-                //         let browserGamePad = gamepad.browserGamepad;
-                //         if (!this.gamepads[gamepad.index])
-                //             this.gamepads[gamepad.index] = new GP()
-                //         for (let i = 0; i < browserGamePad.buttons.length; i++) {
-                //             if (this.gamepads[gamepad.index].buttons[i] && this.gamepads[gamepad.index].buttons[i] != browserGamePad.buttons[i].value)
-                //                 this.trigger_raw(gamepad.index, i, browserGamePad.buttons[i].value)
-                //             this.gamepads[gamepad.index].buttons[i] = browserGamePad.buttons[i].value;
-                //         }
-
-                //         this.gamepads[gamepad.index].joystick[0] = gamepad.leftStick
-                //         this.gamepads[gamepad.index].joystick[1] = gamepad.rightStick
-                //     }
-
-                //     let nw = this.getAll();
-                //     let triggered = false;
-                //     for (let key of Object.keys(nw).filter(key => {
-                //         return nw[key] != this.prevState[key]
-                //     })) {
-                //         triggered = true;
-                //         this.trigger(key, nw[key]);
-                //     }
-                //     if (triggered)
-                //         this.trigger("state");
-
-                //     this.prevState = nw;
-                // })
+   
                 this.gamepads[4].buttons = {};
                 window.addEventListener("keydown", e => {
                     this.key(e.code, 1.0);
@@ -297,7 +264,7 @@
                 for (let i = 0; i < gamepad.buttons.length; i++) {
                     this.buttons.push(0)
                 }
-                for (let i = 0; i < gamepad.axes.length; i += 2) {
+                for (let i = 0; i < 2; i += 2) {
                     this.joystick.push({ x: 0, y: 0 })
                 }
             }
@@ -315,9 +282,14 @@
     </script>
     <script type="module">
         import * as AP from "https://unpkg.com/archipelago.js@2.0.4/dist/archipelago.min.js";
-
+        
+        try{
         const synth = new Tone.Synth().toDestination();
         window.synth = synth;
+        }
+        catch{
+
+        }
         const client = new AP.Client();
         window.client= client;
 
