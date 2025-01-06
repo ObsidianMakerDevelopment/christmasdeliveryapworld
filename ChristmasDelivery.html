@@ -543,8 +543,14 @@
                 if (hint_Obj) {
                     hint = ": " + hint_Obj.name + " for " + hint_Obj.receiver.name
                 }
-                ctx.textAlign = "right"
-                ctx.fillText(sc + " " + hint, 320, 12);
+                if (ctx.measureText(sc + " " + hint ).width > 320-90) {
+                    ctx.textAlign = "left"
+                    ctx.fillText(sc + " " + hint, 90, 12);
+                }
+                else {
+                    ctx.textAlign = "right"
+                    ctx.fillText(sc + " " + hint, 320, 12);
+                }
                 ctx.textAlign = "left"
             }
 
